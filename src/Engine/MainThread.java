@@ -23,7 +23,7 @@ public class MainThread extends Thread{
     }
     //endregion
 
-  
+    
 
     public void SetLoad(int val){
         if(load >= minLoad && load <=maxLoad) {
