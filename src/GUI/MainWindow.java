@@ -1,5 +1,6 @@
 package GUI;
 
+import Engine.MainThread;
 import Engine.Test;
 
 import javax.swing.*;
@@ -17,7 +18,7 @@ public class MainWindow  extends JFrame implements ActionListener {
 
     //region VARIABLES
 UIFactory uiFactory = new UIFactory();
-
+MainThread mainThread= null;
 
     //region Window Controlls
 
@@ -157,11 +158,21 @@ boolean customGui = true;
     add(pbarVoltageGen);
     pbarCurrentCharge = uiFactory.NewJProgressBar(100,0,40,120,70,600,30,uiTheme);
     add(pbarCurrentCharge);
-    pbarLoad = uiFactory.NewJProgressBar(100,0,80,130,360,460,120,uiTheme);
+    pbarLoad = uiFactory.NewJProgressBar(10,0,80,130,360,460,120,uiTheme);
     add(pbarLoad);
     //endregion
 }
 
+void RestartValuesAllControls(){
+    pbarCurrentCharge.setValue(pbarCurrentCharge.getMinimum());
+    pbarVoltageGen.setValue(pbarVoltageGen.getMinimum());
+    pbarVoltageBat.setValue(pbarVoltageBat.getMinimum());
+    pbarLoad.setValue(pbarLoad.getMinimum());
+    lblCurrentCharge.setText("0A");
+    lblVoltageBat.setText("0V");
+    lblVoltageGen.setText("0V");
+    lblMode.setText("DEFAULT");
+}
 
     public void setLoadIndicator(int val){
         pbarLoad.setValue(val);
@@ -185,8 +196,29 @@ boolean customGui = true;
     @Override
     public void actionPerformed(ActionEvent actionEvent) {
         if(actionEvent.getSource()==btnStartStopProgram) {
-            Test t = new Test(this);
-            t.start();
+            if(mainThread == null){
+                mainThread = new MainThread(this);
+                mainThread.start();
+                btnStartStopProgram.setText("OFF");
+            }
+            else
+            {
+                mainThread.interrupt();
+                mainThread = null;
+                btnStartStopProgram.setText("ON");
+                RestartValuesAllControls();
+            }
+
+        }
+        if(actionEvent.getSource()==btnLoadAdd) {
+            if(!(mainThread == null)) {
+                mainThread.IncreaseLoad();
+            }
+        }
+        if(actionEvent.getSource()==btnLoadLess) {
+            if(!(mainThread == null)) {
+                mainThread.DecreaseLoad();
+            }
         }
         else if(actionEvent.getSource()==btnChangeUi1){
             ReloadAllControls("SampleUi");
