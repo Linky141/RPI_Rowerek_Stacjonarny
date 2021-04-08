@@ -3,11 +3,14 @@ package GUI;
 import Engine.MainThread;
 import Engine.Test;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.geom.Line2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -19,7 +22,7 @@ public class MainWindow  extends JFrame implements ActionListener {
     //region VARIABLES
 UIFactory uiFactory = new UIFactory();
 MainThread mainThread= null;
-
+    JLabel BackgroundImage;
     //region Window Controlls
 
     //region Buttons
@@ -40,6 +43,7 @@ MainThread mainThread= null;
     JLabel lblCurrentCharge;
     JLabel lblSMode;
     JLabel lblMode;
+    JLabel lblMyCredit;
     //endregion
 
     //region ProgressBar
@@ -67,17 +71,35 @@ boolean customGui = true;
         setLayout(null);
         //endregion
 
-        LoadAllControls("SampleUi");
+        BufferedImage myPicture = ImageIO.read(new File("src/GUI/Assets/Schema2_WindowBG.png"));
+        BackgroundImage = new JLabel(new ImageIcon(myPicture));
+        BackgroundImage.setBounds(0,0,800,480);
 
+        LoadAllControls("DarkUi");
+
+        add(BackgroundImage);
     }
 
-    void SetMainWindowTheme(String uiTheme){
-        if(uiTheme.equals("SampleUi")) getContentPane().setBackground(Color.darkGray);
-        else if(uiTheme.equals("ContrastUi")) getContentPane().setBackground(Color.black);
-        else if(uiTheme.equals("ColorUi")) getContentPane().setBackground(Color.red);
+    void SetMainWindowTheme(String uiTheme) throws IOException {
+        if(uiTheme.equals("DarkUi")) {
+            getContentPane().setBackground(Color.darkGray);
+            BufferedImage myPicture = ImageIO.read(new File("src/GUI/Assets/Schema1_WindowBG.png"));
+            BackgroundImage.setIcon(new ImageIcon(myPicture));
+        }
+        else if(uiTheme.equals("LightUi")) {
+            BufferedImage myPicture = ImageIO.read(new File("src/GUI/Assets/Schema2_WindowBG.png"));
+          BackgroundImage.setIcon(new ImageIcon(myPicture));
+        }
+        else if(uiTheme.equals("ColorUi")) {
+            BufferedImage myPicture = ImageIO.read(new File("src/GUI/Assets/Schema3_WindowBG.png"));
+            BackgroundImage.setIcon(new ImageIcon(myPicture));
+        }
     }
 
-    void ReloadAllControls(String uiTheme) {
+
+
+
+    void ReloadAllControls(String uiTheme) throws IOException {
         SetMainWindowTheme(uiTheme);
 
         //region JButton
@@ -98,6 +120,7 @@ boolean customGui = true;
         lblCurrentCharge = uiFactory.ReloadJLabelUISchema(lblCurrentCharge, uiTheme);
         lblSMode = uiFactory.ReloadJLabelUISchema(lblSMode, uiTheme);
         lblMode = uiFactory.ReloadJLabelUISchema(lblMode, uiTheme);
+        lblMyCredit= uiFactory.ReloadJLabelUISchema(lblMyCredit, uiTheme);
         //endregion
 
         //region JProgressBar
@@ -108,20 +131,20 @@ boolean customGui = true;
         //endregion
     }
 
-    void LoadAllControls(String uiTheme){
+    void LoadAllControls(String uiTheme) throws IOException {
     SetMainWindowTheme(uiTheme);
 
     //region JButton
     btnStartStopProgram = uiFactory.NewJButton("On", 10, 200, 200, 30, uiTheme);
     btnStartStopProgram.addActionListener(this);
     add(btnStartStopProgram);
-    btnChangeUi1 = uiFactory.NewJButton("UI 1", 750, 390, 50, 30, uiTheme);
+    btnChangeUi1 = uiFactory.NewJButton("UI 1", 730, 390, 70, 30, uiTheme);
     btnChangeUi1.addActionListener(this);
     add(btnChangeUi1);
-    btnChangeUi2 = uiFactory.NewJButton("UI 2", 750, 420, 50, 30, uiTheme);
+    btnChangeUi2 = uiFactory.NewJButton("UI 2", 730, 420, 70, 30, uiTheme);
     btnChangeUi2.addActionListener(this);
     add(btnChangeUi2);
-    btnChangeUi3 = uiFactory.NewJButton("UI 3", 750, 450, 50, 30, uiTheme);
+    btnChangeUi3 = uiFactory.NewJButton("UI 3", 730, 450, 70, 30, uiTheme);
     btnChangeUi3.addActionListener(this);
     add(btnChangeUi3);
     btnLoadAdd = uiFactory.NewJButton("+", 600, 360, 120, 120, uiTheme);
@@ -149,6 +172,8 @@ boolean customGui = true;
     add(lblSMode);
     lblMode = uiFactory.NewJLabel("CHARGING", 40,120,200,30, uiTheme);
     add(lblMode);
+    lblMyCredit= uiFactory.NewJLabel("Linky141 2021", 20,330,200,30, uiTheme);
+    add(lblMyCredit);
     //endregion
 
     //region ProgressBar
@@ -221,13 +246,25 @@ void RestartValuesAllControls(){
             }
         }
         else if(actionEvent.getSource()==btnChangeUi1){
-            ReloadAllControls("SampleUi");
+            try {
+                ReloadAllControls("DarkUi");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         else if(actionEvent.getSource()==btnChangeUi2){
-            ReloadAllControls("ContrastUi");
+            try {
+                ReloadAllControls("LightUi");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         else if(actionEvent.getSource()==btnChangeUi3){
-            ReloadAllControls("ColorUi");
+            try {
+                ReloadAllControls("ColorUi");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }

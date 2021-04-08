@@ -1,6 +1,11 @@
 package GUI;
 
+import javafx.scene.control.ProgressBar;
+
 import javax.swing.*;
+import javax.swing.border.AbstractBorder;
+import javax.swing.border.Border;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.util.ArrayList;
 
@@ -9,8 +14,8 @@ public class UIFactory {
     private ArrayList<String> lblSchemaNames = new ArrayList<String>();
 
     public UIFactory(){
-        lblSchemaNames.add("SampleUi");
-        lblSchemaNames.add("ContrastUi");
+        lblSchemaNames.add("DarkUi");
+        lblSchemaNames.add("LightUi");
         lblSchemaNames.add("ColorUi");
     }
 
@@ -20,7 +25,6 @@ public class UIFactory {
         btn.setBounds(x,y,w,h);
         btn.setFocusPainted(false);
         btn = ChangeSchemaJButton(btn, UiSchema);
-
         return btn;
     }
 
@@ -33,24 +37,20 @@ public class UIFactory {
         return btn;
     }
 
-
     private JButton ChangeSchemaJButton(JButton btn, String Schema){
+        btn.setOpaque(false);
+        btn.setContentAreaFilled(false);
         if(Schema.equals(lblSchemaNames.get(0))){
-            btn.setBackground(Color.darkGray);
             btn.setForeground(Color.lightGray);
-            btn.setBorder(BorderFactory.createMatteBorder(2,6,2,6,Color.lightGray));
+            btn.setBorder(new RoundedBorder(3, 20, Color.lightGray));
         }
         else if(Schema.equals(lblSchemaNames.get(1))){
-
-            btn.setBackground(Color.black);
-            btn.setForeground(Color.white);
-            btn.setBorder(BorderFactory.createMatteBorder(2,6,2,6,Color.white));
+            btn.setForeground(Color.darkGray);
+            btn.setBorder(new RoundedBorder(3, 20, Color.gray));
         }
         else if(Schema.equals(lblSchemaNames.get(2))){
-
-            btn.setBackground(Color.blue);
             btn.setForeground(Color.pink);
-            btn.setBorder(BorderFactory.createMatteBorder(2,6,2,6,Color.green));
+            btn.setBorder(new RoundedBorder(3, 20, Color.pink));
         }
         return btn;
     }
@@ -79,7 +79,7 @@ public class UIFactory {
             lbl.setForeground(Color.lightGray);
         }
         else if(Schema.equals(lblSchemaNames.get(1))){
-            lbl.setForeground(Color.white);
+            lbl.setForeground(Color.darkGray);
         }
         else if(Schema.equals(lblSchemaNames.get(2))){
             lbl.setForeground(Color.orange);
@@ -128,22 +128,19 @@ public class UIFactory {
 
 
     private JProgressBar ChangeSchemaJProgressBar(JProgressBar jpb, String Schema){
+        jpb.setOpaque(false);
+//        jpb.setContentAreaFilled(false);
         if(Schema.equals(lblSchemaNames.get(0))){
-            jpb.setBackground(Color.darkGray);
             jpb.setForeground(Color.lightGray);
-            jpb.setBorder(BorderFactory.createMatteBorder(6,1,6,1,Color.lightGray));
+            jpb.setBorder(BorderFactory.createMatteBorder(2,2,0,0,Color.lightGray));
         }
         else if(Schema.equals(lblSchemaNames.get(1))){
-
-            jpb.setBackground(Color.black);
-            jpb.setForeground(Color.white);
-            jpb.setBorder(BorderFactory.createMatteBorder(6,1,6,1,Color.white));
+            jpb.setForeground(Color.gray);
+            jpb.setBorder(BorderFactory.createMatteBorder(2,2,0,0,Color.gray));
         }
         else if(Schema.equals(lblSchemaNames.get(2))){
-
-            jpb.setBackground(Color.blue);
             jpb.setForeground(Color.pink);
-            jpb.setBorder(BorderFactory.createMatteBorder(6,1,6,1,Color.yellow));
+            jpb.setBorder(BorderFactory.createMatteBorder(2,2,0,0,Color.orange));
         }
         return jpb;
     }
