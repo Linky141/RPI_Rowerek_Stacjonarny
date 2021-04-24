@@ -83,12 +83,12 @@ public class MainThread extends Thread {
 
 
         breakingPWMThread.start();
-        breakingPWMThread.SetAll(500, 50);
+        breakingPWMThread.SetAll(400, 50);
         breakingPWMThread.SetState(true);
 
 
         chargingPWMThread.start();
-        chargingPWMThread.SetAll(1000, 50);
+        chargingPWMThread.SetAll(300, 50);
         chargingPWMThread.SetState(true);
 
         mainWindowReference.setLoadIndicator(minLoad);
@@ -126,8 +126,10 @@ public class MainThread extends Thread {
     public void run() {
         try {
             while (true) {
-                breakingPWMThread.SetPWMFilling(load * 10);
-                chargingPWMThread.SetPWMFilling(load * 10);
+
+                    breakingPWMThread.SetPWMFilling(load * 10);
+                    chargingPWMThread.SetPWMFilling(load * 10);
+
                 Thread.sleep(load * 10);
 //                Gpio00.low();
 //                Gpio01.low();

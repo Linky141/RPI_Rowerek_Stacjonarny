@@ -2,6 +2,8 @@ package Engine;
 
 import com.pi4j.io.gpio.GpioPinDigitalOutput;
 
+import java.util.concurrent.TimeUnit;
+
 public class ChargingPWMThread extends Thread{
 
     private int frequency=-1;
@@ -22,30 +24,29 @@ public class ChargingPWMThread extends Thread{
     public boolean SetFrequency(int freq){
         if(freq<0) return false;
         this.frequency = freq;
-        int cycle=(int)(1000/frequency);
+        int cycle=(int)(1000000000/frequency);
         low=(int)(cycle-((cycle*filling)/100));
         high=(int)((cycle*filling)/100);
 
         return true;
     }
 
-    public boolean SetPWMFilling(int filling){
+    public boolean SetPWMFilling(int fill){
         if(filling > 100 || filling < 0) return false;
-        this.filling = filling;
-        int cycle=(int)(1000/frequency);
+        this.filling = fill;
+        int cycle=(int)(1000000000/frequency);
         low=(int)(cycle-((cycle*filling)/100));
         high=(int)((cycle*filling)/100);
         return true;
     }
 
-    public boolean SetAll(int freq, int filling){
+    public boolean SetAll(int freq, int fill){
         if(filling > 100 || filling < 0 || freq < 0) return false;
-        this.frequency = freq;
-        this.filling = filling;
-        int cycle=(int)(1000/frequency);
-        low=(int)(cycle-((cycle*filling)/100));
-        high=(int)((cycle*filling)/100);
-        return true;
+        boolean succesFreq, succesFill;
+        succesFreq = SetFrequency(freq);
+        succesFill = SetPWMFilling(fill);
+        if(succesFill && succesFreq) return true;
+        else return false;
     }
 
     public void SetState(boolean state)
@@ -59,14 +60,17 @@ public class ChargingPWMThread extends Thread{
             while(true) {
                 if(runningPWM){
                     Gpio01.high();
-                Thread.sleep(high);
+//                Thread.sleep(0,high);
+                    TimeUnit.NANOSECONDS.sleep(high);
                     Gpio01.low();
-                Thread.sleep(low);
+//                Thread.sleep(0,low);
+                    TimeUnit.NANOSECONDS.sleep(low);
                 }
                 else
                 {
                     Gpio01.low();
-                    Thread.sleep(low);
+//                    Thread.sleep(0,low);
+                    TimeUnit.NANOSECONDS.sleep(low);
                 }
             }
         } catch (InterruptedException e) {
