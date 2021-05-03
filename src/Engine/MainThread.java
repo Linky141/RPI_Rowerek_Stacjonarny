@@ -1,13 +1,18 @@
 package Engine;
 
 import GUI.MainWindow;
-import com.pi4j.io.gpio.*;
+import com.pi4j.gpio.extension.pca.PCA9685GpioProvider;
+import com.pi4j.gpio.extension.pca.PCA9685Pin;
+import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPinPwmOutput;
+import com.pi4j.io.gpio.Pin;
 import com.pi4j.io.i2c.I2CBus;
 import com.pi4j.io.i2c.I2CDevice;
 import com.pi4j.io.i2c.I2CFactory;
-import sun.applet.Main;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
 public class MainThread extends Thread {
 
@@ -21,7 +26,7 @@ public class MainThread extends Thread {
     //endregion
 
     //region VARIABLES
-    //region Device config variables
+    //region INA 3221 CONFIG variables
     public static final int INA3221_ADDR = 0x40;
     public static final byte READ_DATA_1_BYTE = (byte) 0x04;
     public static final int INA3221_REG_CONFIG = 0x00;
@@ -40,37 +45,32 @@ public class MainThread extends Thread {
     public static final byte INA3221_CONFIG_MODE_2 = (byte) 0x0004;
     public static final byte INA3221_CONFIG_MODE_1 = (byte) 0x0002;
     public static final byte INA3221_CONFIG_MODE_0 = (byte) 0x0001;
+    //endregion
 
-//    BaterryAndGeneratorInfo batChargInfo;
+    //region PCA9685 CONFIG variables
+    public static final byte PCA9685_ADDR = (byte) 0x42;
+    PCA9685GpioProvider PCA9685provider = null;
+    GpioPinPwmOutput[] PCA9685Outputs = null;
+    //endregion
 
     I2CBus i2c;
-    I2CDevice device;
+    I2CDevice INA3221Device;
 
-
-    private GpioController gpio = GpioFactory.getInstance();
-    private GpioPinDigitalOutput Gpio00 = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_00, "Gpio00", PinState.HIGH);
-    private GpioPinDigitalOutput Gpio01 = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_01, "Gpio01", PinState.HIGH);
-    private GpioPinDigitalOutput Gpio02 = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_02, "Gpio02", PinState.HIGH);
-    private GpioPinDigitalOutput Gpio03 = gpio.provisionDigitalOutputPin(RaspiPin.GPIO_03, "Gpio03", PinState.HIGH);
-
-    BreakingPWMThread breakingPWMThread = new BreakingPWMThread(Gpio00);
-    ChargingPWMThread chargingPWMThread = new ChargingPWMThread(Gpio01);
 //endregion
 
+
     //region constructor
-    public MainThread(MainWindow mw) throws IOException, I2CFactory.UnsupportedBusNumberException {
+    public MainThread(MainWindow mw) throws IOException, I2CFactory.UnsupportedBusNumberException, InterruptedException {
         this.mainWindowReference = mw;
 
-
-
         i2c = I2CFactory.getInstance(I2CBus.BUS_1);
-        device = i2c.getDevice(INA3221_ADDR);
 
+        //region config INA3221
+        //        INA3221Device = i2c.getDevice(INA3221_ADDR);
+//        INA3221Device.write(0x00, (byte) 0b01110001);
+//        INA3221Device.write((byte) 0b00100111);
 
-//        device.write(0x00, (byte) 0b01110001);
-//        device.write((byte) 0b00100111);
-
-        byte config = INA3221_CONFIG_ENABLE_CHAN1 |
+        byte INA3221config = INA3221_CONFIG_ENABLE_CHAN1 |
                 INA3221_CONFIG_ENABLE_CHAN2 |
                 INA3221_CONFIG_ENABLE_CHAN3 |
                 INA3221_CONFIG_AVG1 |
@@ -79,21 +79,52 @@ public class MainThread extends Thread {
                 INA3221_CONFIG_MODE_2 |
                 INA3221_CONFIG_MODE_1 |
                 INA3221_CONFIG_MODE_0;
-//        device.write(INA3221_REG_CONFIG, config);
+//        INA3221Device.write(INA3221_REG_CONFIG, INA3221config);
 
+        //endregion
 
-        breakingPWMThread.start();
-        breakingPWMThread.SetAll(400, 50);
-        breakingPWMThread.SetState(true);
-
-
-        chargingPWMThread.start();
-        chargingPWMThread.SetAll(300, 50);
-        chargingPWMThread.SetState(true);
+        //region configPCA9685
+        BigDecimal frequency = new BigDecimal("1000");
+        BigDecimal frequencyCorrectionFactor = new BigDecimal("1");
+        PCA9685provider = new PCA9685GpioProvider(i2c, PCA9685_ADDR, frequency, frequencyCorrectionFactor);
+        PCA9685Outputs = provisionPwmOutputs(PCA9685provider);
+        PCA9685provider.reset();
+        //endregion
 
         mainWindowReference.setLoadIndicator(minLoad);
     }
     //endregion
+
+    private static int checkForOverflow(int position) {
+        int result = position;
+        if (position > PCA9685GpioProvider.PWM_STEPS - 1) {
+            result = position - PCA9685GpioProvider.PWM_STEPS - 1;
+        }
+        return result;
+    }
+
+
+    private static GpioPinPwmOutput[] provisionPwmOutputs(final PCA9685GpioProvider gpioProvider) {
+        GpioController gpio = GpioFactory.getInstance();
+        GpioPinPwmOutput myOutputs[] = {
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_00, "Pulse 00"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_01, "Pulse 01"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_02, "Pulse 02"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_03, "Pulse 03"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_04, "Pulse 04"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_05, "Pulse 05"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_06, "Pulse 06"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_07, "Pulse 07"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_08, "Pulse 08"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_09, "Pulse 09"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_10, "Always ON"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_11, "Always OFF"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_12, "Servo pulse MIN"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_13, "Servo pulse NEUTRAL"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_14, "Servo pulse MAX"),
+                gpio.provisionPwmOutputPin(gpioProvider, PCA9685Pin.PWM_15, "not used")};
+        return myOutputs;
+    }
 
 
     public void SetLoad(int val) {
@@ -127,23 +158,40 @@ public class MainThread extends Thread {
         try {
             while (true) {
 
-                    breakingPWMThread.SetPWMFilling(load * 10);
-                    chargingPWMThread.SetPWMFilling(load * 10);
+//                if(load == 0) {
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 800);
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
+//                }
+//                else if(load==100) {
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 499);
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 499);
+//                }
+//                else {
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, (400+load));
+//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, (400+load));
+//                }
 
-                Thread.sleep(load * 10);
-//                Gpio00.low();
-//                Gpio01.low();
-                Gpio02.low();
-                Gpio03.low();
-                Thread.sleep(load * 10);
-//                Gpio00.high();
-//                Gpio01.high();
-                Gpio02.high();
-                Gpio03.high();
+                if(load == 0) {
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 320);
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 320);
+                }
+                else if(load==maxLoad) {
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 340);
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 340);
+                }
+                 else {
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, (int)(320+load*2));
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, (int)(320+load*2));
+                }
+                Thread.sleep(100);
+
             }
         } catch (InterruptedException e) {
             System.out.println("MainThred is interrupted");
         }
+//        catch (IOException e) {
+//            e.printStackTrace();
+//        }
     }
 
 }

@@ -261,7 +261,7 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } catch (I2CFactory.UnsupportedBusNumberException e) {
+        } catch (I2CFactory.UnsupportedBusNumberException | InterruptedException e) {
             e.printStackTrace();
         }
     }

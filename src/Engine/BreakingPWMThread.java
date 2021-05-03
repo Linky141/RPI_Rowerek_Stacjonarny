@@ -1,6 +1,7 @@
 package Engine;
 
-import com.pi4j.io.gpio.GpioPinDigitalOutput;
+import com.pi4j.io.gpio.*;
+import com.pi4j.util.CommandArgumentParser;
 
 import java.util.concurrent.TimeUnit;
 
@@ -11,42 +12,40 @@ public class BreakingPWMThread extends Thread{
     private int low=-1;
     private int high=-1;
     private boolean runningPWM = false;
-    final GpioPinDigitalOutput Gpio00;
+//    final GpioPinDigitalOutput Gpio00;
 
-    public BreakingPWMThread(GpioPinDigitalOutput gpio){
-        Gpio00 = gpio;
+    GpioController gpio = GpioFactory.getInstance();
+
+    Pin pin = CommandArgumentParser.getPin(
+            RaspiPin.class,    // pin provider class to obtain pin instance from
+            RaspiPin.GPIO_01  // default pin if no pin argument found
+            );             // argument array to search in
+
+    GpioPinPwmOutput pwm = gpio.provisionPwmOutputPin(pin);
+
+    public BreakingPWMThread(){
+//        Gpio00 = gpio;
         frequency=0;
         low=0;
         high=0;
         filling=0;
+
+        com.pi4j.wiringpi.Gpio.pwmSetMode(com.pi4j.wiringpi.Gpio.PWM_MODE_MS);
+        com.pi4j.wiringpi.Gpio.pwmSetRange(1000);
+        com.pi4j.wiringpi.Gpio.pwmSetClock(500);
     }
 
     public boolean SetFrequency(int freq){
-        if(freq<0) return false;
-        this.frequency = freq;
-        int cycle=(int)(1000000000/frequency);
-        low=(int)(cycle-((cycle*filling)/100));
-        high=(int)((cycle*filling)/100);
-
         return true;
     }
 
     public boolean SetPWMFilling(int fill){
-        if(filling > 100 || filling < 0) return false;
-        this.filling = fill;
-        int cycle=(int)(1000000000/frequency);
-        low=(int)(cycle-((cycle*filling)/100));
-        high=(int)((cycle*filling)/100);
+        pwm.setPwm(fill);
         return true;
     }
 
     public boolean SetAll(int freq, int fill){
-        if(filling > 100 || filling < 0 || freq < 0) return false;
-        boolean succesFreq, succesFill;
-        succesFreq = SetFrequency(freq);
-        succesFill = SetPWMFilling(fill);
-        if(succesFill && succesFreq) return true;
-        else return false;
+        return true;
     }
 
     public void SetState(boolean state)
@@ -58,20 +57,7 @@ public class BreakingPWMThread extends Thread{
     public void run() {
         try{
             while(true) {
-                if(runningPWM){
-                    Gpio00.high();
-//                Thread.sleep(0,high);
-                    TimeUnit.NANOSECONDS.sleep(high);
-                    Gpio00.low();
-//                Thread.sleep(0,low);
-                    TimeUnit.NANOSECONDS.sleep(low);
-                }
-                else
-                {
-                    Gpio00.low();
-//                    Thread.sleep(0,low);
-                    TimeUnit.NANOSECONDS.sleep(low);
-                }
+              Thread.sleep(100);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();

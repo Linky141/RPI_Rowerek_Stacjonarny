@@ -11,10 +11,10 @@ public class ChargingPWMThread extends Thread{
     private int low=-1;
     private int high=-1;
     private boolean runningPWM = false;
-    final GpioPinDigitalOutput Gpio01;
+//    final GpioPinDigitalOutput Gpio01;
 
-    public ChargingPWMThread(GpioPinDigitalOutput gpio){
-        Gpio01 = gpio;
+    public ChargingPWMThread(){
+//        Gpio01 = gpio;
         frequency=0;
         low=0;
         high=0;
@@ -22,31 +22,15 @@ public class ChargingPWMThread extends Thread{
     }
 
     public boolean SetFrequency(int freq){
-        if(freq<0) return false;
-        this.frequency = freq;
-        int cycle=(int)(1000000000/frequency);
-        low=(int)(cycle-((cycle*filling)/100));
-        high=(int)((cycle*filling)/100);
-
-        return true;
+      return true;
     }
 
     public boolean SetPWMFilling(int fill){
-        if(filling > 100 || filling < 0) return false;
-        this.filling = fill;
-        int cycle=(int)(1000000000/frequency);
-        low=(int)(cycle-((cycle*filling)/100));
-        high=(int)((cycle*filling)/100);
         return true;
     }
 
     public boolean SetAll(int freq, int fill){
-        if(filling > 100 || filling < 0 || freq < 0) return false;
-        boolean succesFreq, succesFill;
-        succesFreq = SetFrequency(freq);
-        succesFill = SetPWMFilling(fill);
-        if(succesFill && succesFreq) return true;
-        else return false;
+        return true;
     }
 
     public void SetState(boolean state)
@@ -58,20 +42,7 @@ public class ChargingPWMThread extends Thread{
     public void run() {
         try{
             while(true) {
-                if(runningPWM){
-                    Gpio01.high();
-//                Thread.sleep(0,high);
-                    TimeUnit.NANOSECONDS.sleep(high);
-                    Gpio01.low();
-//                Thread.sleep(0,low);
-                    TimeUnit.NANOSECONDS.sleep(low);
-                }
-                else
-                {
-                    Gpio01.low();
-//                    Thread.sleep(0,low);
-                    TimeUnit.NANOSECONDS.sleep(low);
-                }
+              Thread.sleep(100);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
