@@ -14,7 +14,6 @@ public class Test extends Thread {
         try {
             while (true) {
                 for (int clk = 0; clk < 100; clk++) {
-                    mw.setLoadIndicator(clk);
                     mw.setVoltageBatIndicator(clk);
                     mw.setCurrentChargeIndicator(clk);
                     mw.setVoltageGenIndicator(clk);

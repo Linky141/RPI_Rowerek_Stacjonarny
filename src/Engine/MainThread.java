@@ -11,6 +11,7 @@ import com.pi4j.io.i2c.I2CBus;
 import com.pi4j.io.i2c.I2CDevice;
 import com.pi4j.io.i2c.I2CFactory;
 
+import java.awt.*;
 import java.io.IOException;
 import java.math.BigDecimal;
 
@@ -18,11 +19,10 @@ public class MainThread extends Thread {
 
     //region variables
     MainWindow mainWindowReference;
+    public boolean chargingState=false;
+    public boolean allowTurnOnCharging = false;
+    private double minimumVoltageToAllowCharging = 10;
 
-
-    int load = 0;
-    int maxLoad = 10;
-    int minLoad = 0;
     //endregion
 
     //region VARIABLES
@@ -66,9 +66,9 @@ public class MainThread extends Thread {
         i2c = I2CFactory.getInstance(I2CBus.BUS_1);
 
         //region config INA3221
-        //        INA3221Device = i2c.getDevice(INA3221_ADDR);
-//        INA3221Device.write(0x00, (byte) 0b01110001);
-//        INA3221Device.write((byte) 0b00100111);
+                INA3221Device = i2c.getDevice(INA3221_ADDR);
+        INA3221Device.write(0x00, (byte) 0b01110001);
+        INA3221Device.write( (byte) 0b00100111);
 
         byte INA3221config = INA3221_CONFIG_ENABLE_CHAN1 |
                 INA3221_CONFIG_ENABLE_CHAN2 |
@@ -79,7 +79,7 @@ public class MainThread extends Thread {
                 INA3221_CONFIG_MODE_2 |
                 INA3221_CONFIG_MODE_1 |
                 INA3221_CONFIG_MODE_0;
-//        INA3221Device.write(INA3221_REG_CONFIG, INA3221config);
+        INA3221Device.write(INA3221_REG_CONFIG, INA3221config);
 
         //endregion
 
@@ -91,7 +91,6 @@ public class MainThread extends Thread {
         PCA9685provider.reset();
         //endregion
 
-        mainWindowReference.setLoadIndicator(minLoad);
     }
     //endregion
 
@@ -126,29 +125,56 @@ public class MainThread extends Thread {
         return myOutputs;
     }
 
+    private double INA3221_ReadVoltage1() throws IOException {
+        byte[] bytes = new byte[2];
+        INA3221Device.read(0x02, bytes, 0, 2);
+        int value = 0;
+        value = Byte.toUnsignedInt(bytes[1]);
+        value ^= (bytes[0] << 8);
+        return (double) (value)*0.001;
+    }
 
-    public void SetLoad(int val) {
-        if (load >= minLoad && load <= maxLoad) {
-            int lastLoad = load;
-            this.load = val;
-            mainWindowReference.setLoadIndicator(load);
+    private double INA3221_ReadVoltage2() throws IOException {
+        byte[] bytes = new byte[2];
+        INA3221Device.read(0x04, bytes, 0, 2);
+        int value = 0;
+        value = Byte.toUnsignedInt(bytes[1]);
+        value ^= (bytes[0] << 8);
+        return (double) (value)*0.001;
+    }
+
+    private double INA3221_ReadVoltage3() throws IOException {
+        byte[] bytes = new byte[2];
+        INA3221Device.read(0x06, bytes, 0, 2);
+        int value = 0;
+        value = Byte.toUnsignedInt(bytes[1]);
+        value ^= (bytes[0] << 8);
+        return (double) (value)*0.001;
+    }
+
+    private void ChangeChargingButtonState() throws IOException {
+        CheckButtonConditions();
+        if(!chargingState) {
+            if(allowTurnOnCharging) {
+                mainWindowReference.ChangeColorChargingButton(Color.RED);
+            }
+            else {
+                mainWindowReference.ChangeColorChargingButton(Color.GRAY);
+            }
+        }
+        else {
+            mainWindowReference.ChangeColorChargingButton(Color.GREEN);
         }
     }
 
-    public void DecreaseLoad() {
-        if (load > minLoad) {
-            load--;
-            mainWindowReference.setLoadIndicator(load);
+    private void CheckButtonConditions() throws IOException {
+        if(INA3221_ReadVoltage2() < minimumVoltageToAllowCharging && !chargingState){
+            allowTurnOnCharging = true;
+        }
+        else if(INA3221_ReadVoltage2() >= minimumVoltageToAllowCharging && !chargingState){
+            allowTurnOnCharging = false;
         }
     }
-
-    public void IncreaseLoad() {
-        if (load < maxLoad) {
-            load++;
-            mainWindowReference.setLoadIndicator(load);
-        }
-    }
-
 
     boolean changeLoadIndicator = false;
     int val, lastVal;
@@ -158,9 +184,13 @@ public class MainThread extends Thread {
         try {
             while (true) {
 
+
+
+
+
 //                if(load == 0) {
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 800);
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 690);
+                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
 //                }
 //                else if(load==100) {
 //                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 499);
@@ -171,22 +201,15 @@ public class MainThread extends Thread {
 //                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, (400+load));
 //                }
 
-                if(load == 0) {
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 320);
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 320);
-                }
-                else if(load==maxLoad) {
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 340);
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 340);
-                }
-                 else {
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, (int)(320+load*2));
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, (int)(320+load*2));
-                }
-                Thread.sleep(100);
+                mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
+                mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
+                mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
+
+                ChangeChargingButtonState();
+                Thread.sleep(10);
 
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | IOException e) {
             System.out.println("MainThred is interrupted");
         }
 //        catch (IOException e) {

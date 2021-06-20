@@ -20,36 +20,47 @@ public class UIFactory {
     }
 
     //region JButton
-    public JButton NewJButton(String text, int x, int y, int w, int h, String UiSchema){
+    public JButton NewJButton(String text, int x, int y, int w, int h, String UiSchema, Color color, int fontSize){
         JButton btn = new JButton(text);
         btn.setBounds(x,y,w,h);
         btn.setFocusPainted(false);
-        btn = ChangeSchemaJButton(btn, UiSchema);
+        btn.setFont(new Font("Arial", Font.PLAIN, fontSize));
+        if(color == null)
+            btn = ChangeSchemaJButton(btn, UiSchema, false);
+        else {
+            btn = ChangeSchemaJButton(btn, UiSchema, true);
+            btn.setForeground(color);
+        }
         return btn;
     }
 
-    public JButton NewJButton(String text, int x, int y, int w, int h){
-        return NewJButton(text, x, y, w ,h, "");
+    public JButton NewJButton(String text, int x, int y, int w, int h, Color color){
+        return NewJButton(text, x, y, w ,h, "", color, 10);
     }
 
-    public JButton ReloadJbuttonUISchema(JButton btn, String UiSchema){
-        btn = ChangeSchemaJButton(btn, UiSchema);
+    public JButton ReloadJbuttonUISchema(JButton btn, String UiSchema, boolean customizableColors){
+        btn = ChangeSchemaJButton(btn, UiSchema, customizableColors);
         return btn;
     }
 
-    private JButton ChangeSchemaJButton(JButton btn, String Schema){
+    public JButton ChangeButtonColor(JButton btn, Color color){
+        btn.setForeground(color);
+        return btn;
+    }
+
+    private JButton ChangeSchemaJButton(JButton btn, String Schema, boolean customizableColors){
         btn.setOpaque(false);
         btn.setContentAreaFilled(false);
         if(Schema.equals(lblSchemaNames.get(0))){
-            btn.setForeground(Color.lightGray);
+            if(!customizableColors) btn.setForeground(Color.lightGray);
             btn.setBorder(new RoundedBorder(3, 20, Color.lightGray));
         }
         else if(Schema.equals(lblSchemaNames.get(1))){
-            btn.setForeground(Color.darkGray);
+            if(!customizableColors) btn.setForeground(Color.darkGray);
             btn.setBorder(new RoundedBorder(3, 20, Color.gray));
         }
         else if(Schema.equals(lblSchemaNames.get(2))){
-            btn.setForeground(Color.pink);
+            if(!customizableColors) btn.setForeground(Color.pink);
             btn.setBorder(new RoundedBorder(3, 20, Color.pink));
         }
         return btn;
@@ -94,7 +105,7 @@ public class UIFactory {
         jpb.setBounds(x,y,w,h);
         jpb.setMinimum(min);
         jpb.setMaximum(max);
-        jpb.setValue(40);
+        jpb.setValue(val);
         jpb = ChangeSchemaJProgressBar(jpb, UiSchema);
 
         return jpb;
@@ -150,8 +161,8 @@ public class UIFactory {
     public JSlider NewJSlider(int max, int min, int val, int x, int y, int w, int h, String UiSchema){
         JSlider jsld = new JSlider();
         jsld.setBounds(x,y,w,h);
-        jsld.setMinimum(max);
-        jsld.setMaximum(min);
+        jsld.setMinimum(min);
+        jsld.setMaximum(max);
         jsld.setValue(val);
         jsld.setMajorTickSpacing(10);
         jsld.setMinorTickSpacing(1);

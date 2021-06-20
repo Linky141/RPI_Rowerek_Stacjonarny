@@ -1,7 +1,6 @@
 package GUI;
 
 import Engine.MainThread;
-import Engine.Test;
 import com.pi4j.io.i2c.I2CFactory;
 
 import javax.imageio.ImageIO;
@@ -9,11 +8,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 
 public class MainWindow extends JFrame implements ActionListener {
 
@@ -25,9 +22,7 @@ public class MainWindow extends JFrame implements ActionListener {
     //region Window Controlls
 
     //region Buttons
-    JButton btnStartStopProgram;
-    JButton btnLoadAdd;
-    JButton btnLoadLess;
+    JButton btnChargingStateChange;
     JButton btnChangeUi1;
     JButton btnChangeUi2;
     JButton btnChangeUi3;
@@ -40,25 +35,29 @@ public class MainWindow extends JFrame implements ActionListener {
     JLabel lblVoltageBat;
     JLabel lblVoltageGen;
     JLabel lblCurrentCharge;
-    JLabel lblSMode;
-    JLabel lblMode;
     JLabel lblMyCredit;
+    //    JLabel lblStopInfo;
+    JLabel lblNapięcieAkumulatoraMinimum;
+    JLabel lblNapięcieAkumulatoraMaximum;
+    JLabel lblNapięcieRowerkaMinimum;
+    JLabel lblNapięcieRowerkaMaksimum;
+    JLabel lblPradLadowaniaMinimum;
+    JLabel lblPradLadowaniaMaksimum;
     //endregion
 
     //region ProgressBar
     JProgressBar pbarVoltageBat;
     JProgressBar pbarVoltageGen;
     JProgressBar pbarCurrentCharge;
-    JProgressBar pbarLoad;
     //endregion
 
     //endregion
     boolean customGui = true;
-
+    String stopinfoText = "Proszę zatrzymać rowerek w celu wdrożenia zmiany";
 
     //endregion
 
-    public MainWindow() throws IOException {
+    public MainWindow() throws IOException, I2CFactory.UnsupportedBusNumberException, InterruptedException {
 
 
         //region Window
@@ -77,6 +76,8 @@ public class MainWindow extends JFrame implements ActionListener {
         LoadAllControls("DarkUi");
 
         add(BackgroundImage);
+        mainThread = new MainThread(this);
+        mainThread.start();
     }
 
     void SetMainWindowTheme(String uiTheme) throws IOException {
@@ -98,12 +99,10 @@ public class MainWindow extends JFrame implements ActionListener {
         SetMainWindowTheme(uiTheme);
 
         //region JButton
-        btnStartStopProgram = uiFactory.ReloadJbuttonUISchema(btnStartStopProgram, uiTheme);
-        btnChangeUi1 = uiFactory.ReloadJbuttonUISchema(btnChangeUi1, uiTheme);
-        btnChangeUi2 = uiFactory.ReloadJbuttonUISchema(btnChangeUi2, uiTheme);
-        btnChangeUi3 = uiFactory.ReloadJbuttonUISchema(btnChangeUi3, uiTheme);
-        btnLoadAdd = uiFactory.ReloadJbuttonUISchema(btnLoadAdd, uiTheme);
-        btnLoadLess = uiFactory.ReloadJbuttonUISchema(btnLoadLess, uiTheme);
+        btnChargingStateChange = uiFactory.ReloadJbuttonUISchema(btnChargingStateChange, uiTheme, true);
+        btnChangeUi1 = uiFactory.ReloadJbuttonUISchema(btnChangeUi1, uiTheme, false);
+        btnChangeUi2 = uiFactory.ReloadJbuttonUISchema(btnChangeUi2, uiTheme, false);
+        btnChangeUi3 = uiFactory.ReloadJbuttonUISchema(btnChangeUi3, uiTheme, false);
         //endregion
 
         //region JLabel
@@ -113,16 +112,19 @@ public class MainWindow extends JFrame implements ActionListener {
         lblVoltageBat = uiFactory.ReloadJLabelUISchema(lblVoltageBat, uiTheme);
         lblVoltageGen = uiFactory.ReloadJLabelUISchema(lblVoltageGen, uiTheme);
         lblCurrentCharge = uiFactory.ReloadJLabelUISchema(lblCurrentCharge, uiTheme);
-        lblSMode = uiFactory.ReloadJLabelUISchema(lblSMode, uiTheme);
-        lblMode = uiFactory.ReloadJLabelUISchema(lblMode, uiTheme);
         lblMyCredit = uiFactory.ReloadJLabelUISchema(lblMyCredit, uiTheme);
+        lblNapięcieAkumulatoraMinimum = uiFactory.ReloadJLabelUISchema(lblNapięcieAkumulatoraMinimum, uiTheme);
+        lblNapięcieAkumulatoraMaximum = uiFactory.ReloadJLabelUISchema(lblNapięcieAkumulatoraMaximum, uiTheme);
+        lblNapięcieRowerkaMinimum = uiFactory.ReloadJLabelUISchema(lblNapięcieRowerkaMinimum, uiTheme);
+        lblNapięcieRowerkaMaksimum = uiFactory.ReloadJLabelUISchema(lblNapięcieRowerkaMaksimum, uiTheme);
+        lblPradLadowaniaMinimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMinimum, uiTheme);
+        lblPradLadowaniaMaksimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMaksimum, uiTheme);
         //endregion
 
         //region JProgressBar
         pbarVoltageBat = uiFactory.ReloadJProgressBarUISchema(pbarVoltageBat, uiTheme);
         pbarVoltageGen = uiFactory.ReloadJProgressBarUISchema(pbarVoltageGen, uiTheme);
         pbarCurrentCharge = uiFactory.ReloadJProgressBarUISchema(pbarCurrentCharge, uiTheme);
-        pbarLoad = uiFactory.ReloadJProgressBarUISchema(pbarLoad, uiTheme);
         //endregion
     }
 
@@ -130,56 +132,57 @@ public class MainWindow extends JFrame implements ActionListener {
         SetMainWindowTheme(uiTheme);
 
         //region JButton
-        btnStartStopProgram = uiFactory.NewJButton("On", 10, 200, 200, 30, uiTheme);
-        btnStartStopProgram.addActionListener(this);
-        add(btnStartStopProgram);
-        btnChangeUi1 = uiFactory.NewJButton("UI 1", 730, 390, 70, 30, uiTheme);
+        btnChargingStateChange = uiFactory.NewJButton("Ładowanie", 10, 220, 300, 230, uiTheme, Color.RED, 30);
+        btnChargingStateChange.addActionListener(this);
+        add(btnChargingStateChange);
+        btnChangeUi1 = uiFactory.NewJButton("UI 1", 700, 390, 100, 30, uiTheme, null, 15);
         btnChangeUi1.addActionListener(this);
         add(btnChangeUi1);
-        btnChangeUi2 = uiFactory.NewJButton("UI 2", 730, 420, 70, 30, uiTheme);
+        btnChangeUi2 = uiFactory.NewJButton("UI 2", 700, 420, 100, 30, uiTheme, null, 15);
         btnChangeUi2.addActionListener(this);
         add(btnChangeUi2);
-        btnChangeUi3 = uiFactory.NewJButton("UI 3", 730, 450, 70, 30, uiTheme);
+        btnChangeUi3 = uiFactory.NewJButton("UI 3", 700, 450, 100, 30, uiTheme, null, 15);
         btnChangeUi3.addActionListener(this);
         add(btnChangeUi3);
-        btnLoadAdd = uiFactory.NewJButton("+", 600, 360, 120, 120, uiTheme);
-        btnLoadAdd.addActionListener(this);
-        add(btnLoadAdd);
-        btnLoadLess = uiFactory.NewJButton("-", 1, 360, 120, 120, uiTheme);
-        btnLoadLess.addActionListener(this);
-        add(btnLoadLess);
         //endregion
 
         //region JLabel
-        lblSVoltageBat = uiFactory.NewJLabel("Baterry Voltage", 1, 1, 100, 30, uiTheme);
+        lblSVoltageBat = uiFactory.NewJLabel("Napięcie akumulatora:", 250, 30, 200, 30, uiTheme);
         add(lblSVoltageBat);
-        lblSVoltageGen = uiFactory.NewJLabel("Generator Voltage", 1, 35, 300, 30, uiTheme);
+        lblSVoltageGen = uiFactory.NewJLabel("Napięcie rowerka:", 250, 100, 300, 30, uiTheme);
         add(lblSVoltageGen);
-        lblSCurrentCharge = uiFactory.NewJLabel("Charging Current", 1, 70, 200, 30, uiTheme);
+        lblSCurrentCharge = uiFactory.NewJLabel("Prąd ładowania:", 250, 170, 200, 30, uiTheme);
         add(lblSCurrentCharge);
-        lblVoltageBat = uiFactory.NewJLabel("0.00V", 730, 1, 100, 30, uiTheme);
+        lblVoltageBat = uiFactory.NewJLabel("0.00V", 450, 30, 100, 30, uiTheme);
         add(lblVoltageBat);
-        lblVoltageGen = uiFactory.NewJLabel("0.00V", 730, 35, 100, 30, uiTheme);
+        lblVoltageGen = uiFactory.NewJLabel("0.00V", 450, 100, 100, 30, uiTheme);
         add(lblVoltageGen);
-        lblCurrentCharge = uiFactory.NewJLabel("0.00A", 730, 70, 100, 30, uiTheme);
+        lblCurrentCharge = uiFactory.NewJLabel("0.00A", 450, 170, 100, 30, uiTheme);
         add(lblCurrentCharge);
-        lblSMode = uiFactory.NewJLabel("Mode:", 1, 120, 100, 30, uiTheme);
-        add(lblSMode);
-        lblMode = uiFactory.NewJLabel("CHARGING", 40, 120, 200, 30, uiTheme);
-        add(lblMode);
-        lblMyCredit = uiFactory.NewJLabel("Linky141 2021", 20, 330, 200, 30, uiTheme);
+        lblMyCredit = uiFactory.NewJLabel("Linky141-2021", 20, 450, 200, 30, uiTheme);
         add(lblMyCredit);
+        lblNapięcieAkumulatoraMinimum = uiFactory.NewJLabel("8V", 10, 30, 200, 30, uiTheme);
+        add(lblNapięcieAkumulatoraMinimum);
+        lblNapięcieAkumulatoraMaximum = uiFactory.NewJLabel("20V", 765, 30, 200, 30, uiTheme);
+        add(lblNapięcieAkumulatoraMaximum);
+        lblNapięcieRowerkaMinimum = uiFactory.NewJLabel("0V", 10, 100, 200, 30, uiTheme);
+        add(lblNapięcieRowerkaMinimum);
+        lblNapięcieRowerkaMaksimum = uiFactory.NewJLabel("50V", 765, 100, 200, 30, uiTheme);
+        add(lblNapięcieRowerkaMaksimum);
+        lblPradLadowaniaMinimum = uiFactory.NewJLabel("0A", 10, 170, 200, 30, uiTheme);
+        add(lblPradLadowaniaMinimum);
+        lblPradLadowaniaMaksimum = uiFactory.NewJLabel("10A", 765, 170, 200, 30, uiTheme);
+        add(lblPradLadowaniaMaksimum);
         //endregion
 
         //region ProgressBar
-        pbarVoltageBat = uiFactory.NewJProgressBar(100, 0, 40, 120, 1, 600, 30, uiTheme);
+        pbarVoltageBat = uiFactory.NewJProgressBar(2000, 8, 8, 10, 1, 780, 30, uiTheme);
         add(pbarVoltageBat);
-        pbarVoltageGen = uiFactory.NewJProgressBar(100, 0, 40, 120, 35, 600, 30, uiTheme);
+        pbarVoltageGen = uiFactory.NewJProgressBar(5000, 0, 0, 10, 70, 780, 30, uiTheme);
         add(pbarVoltageGen);
-        pbarCurrentCharge = uiFactory.NewJProgressBar(100, 0, 40, 120, 70, 600, 30, uiTheme);
+        pbarCurrentCharge = uiFactory.NewJProgressBar(1000, 0, 0, 10, 140, 780, 30, uiTheme);
         add(pbarCurrentCharge);
-        pbarLoad = uiFactory.NewJProgressBar(10, 0, 80, 130, 360, 460, 120, uiTheme);
-        add(pbarLoad);
+
         //endregion
     }
 
@@ -187,82 +190,60 @@ public class MainWindow extends JFrame implements ActionListener {
         pbarCurrentCharge.setValue(pbarCurrentCharge.getMinimum());
         pbarVoltageGen.setValue(pbarVoltageGen.getMinimum());
         pbarVoltageBat.setValue(pbarVoltageBat.getMinimum());
-        pbarLoad.setValue(pbarLoad.getMinimum());
         lblCurrentCharge.setText("0A");
         lblVoltageBat.setText("0V");
         lblVoltageGen.setText("0V");
-        lblMode.setText("DEFAULT");
     }
 
-    public void setLoadIndicator(int val) {
-        pbarLoad.setValue(val);
+    public void setVoltageBatIndicator(double val) {
+        pbarVoltageBat.setValue((int) (val *100) );
+        lblVoltageBat.setText(Double.toString(val) + "V");
     }
 
-    public void setVoltageBatIndicator(int val) {
-        pbarVoltageBat.setValue(val);
-        lblVoltageBat.setText(Integer.toString(val) + "V");
+    public void setVoltageGenIndicator(double val) {
+        pbarVoltageGen.setValue((int) (val *100));
+        lblVoltageGen.setText(Double.toString(val) + "V");
     }
 
-    public void setVoltageGenIndicator(int val) {
-        pbarVoltageGen.setValue(val);
-        lblVoltageGen.setText(Integer.toString(val) + "V");
+    public void setCurrentChargeIndicator(double val) {
+        pbarCurrentCharge.setValue((int) (val *100));
+        lblCurrentCharge.setText(Double.toString(val) + "A");
     }
 
-    public void setCurrentChargeIndicator(int val) {
-        pbarCurrentCharge.setValue(val);
-        lblCurrentCharge.setText(Integer.toString(val) + "A");
+    public void ChangeColorChargingButton(Color color) {
+        btnChargingStateChange = uiFactory.ChangeButtonColor(btnChargingStateChange, color);
     }
 
     @Override
     public void actionPerformed(ActionEvent actionEvent) {
-        try {
-            if (actionEvent.getSource() == btnStartStopProgram) {
-                if (mainThread == null) {
-
-                    mainThread = new MainThread(this);
-
-                    mainThread.start();
-                    btnStartStopProgram.setText("OFF");
-                } else {
-                    mainThread.interrupt();
-                    mainThread = null;
-                    btnStartStopProgram.setText("ON");
-                    RestartValuesAllControls();
+        if (actionEvent.getSource() == btnChargingStateChange) {
+            if (!mainThread.chargingState) {
+                if (mainThread.allowTurnOnCharging) {
+                    mainThread.chargingState = true;
                 }
-
+            } else {
+                mainThread.chargingState = false;
             }
-            if (actionEvent.getSource() == btnLoadAdd) {
-                if (!(mainThread == null)) {
-                    mainThread.IncreaseLoad();
-                }
+
+        } else if (actionEvent.getSource() == btnChangeUi1) {
+            try {
+                ReloadAllControls("DarkUi");
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            if (actionEvent.getSource() == btnLoadLess) {
-                if (!(mainThread == null)) {
-                    mainThread.DecreaseLoad();
-                }
-            } else if (actionEvent.getSource() == btnChangeUi1) {
-                try {
-                    ReloadAllControls("DarkUi");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            } else if (actionEvent.getSource() == btnChangeUi2) {
-                try {
-                    ReloadAllControls("LightUi");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            } else if (actionEvent.getSource() == btnChangeUi3) {
-                try {
-                    ReloadAllControls("ColorUi");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        } else if (actionEvent.getSource() == btnChangeUi2) {
+            try {
+                ReloadAllControls("LightUi");
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (I2CFactory.UnsupportedBusNumberException | InterruptedException e) {
-            e.printStackTrace();
+        } else if (actionEvent.getSource() == btnChangeUi3) {
+            try {
+                ReloadAllControls("ColorUi");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
+
     }
 }
