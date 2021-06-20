@@ -36,13 +36,13 @@ public class MainWindow extends JFrame implements ActionListener {
     JLabel lblVoltageGen;
     JLabel lblCurrentCharge;
     JLabel lblMyCredit;
-    //    JLabel lblStopInfo;
     JLabel lblNapięcieAkumulatoraMinimum;
     JLabel lblNapięcieAkumulatoraMaximum;
     JLabel lblNapięcieRowerkaMinimum;
     JLabel lblNapięcieRowerkaMaksimum;
     JLabel lblPradLadowaniaMinimum;
     JLabel lblPradLadowaniaMaksimum;
+    JLabel lblEmergencyInfo;
     //endregion
 
     //region ProgressBar
@@ -119,6 +119,7 @@ public class MainWindow extends JFrame implements ActionListener {
         lblNapięcieRowerkaMaksimum = uiFactory.ReloadJLabelUISchema(lblNapięcieRowerkaMaksimum, uiTheme);
         lblPradLadowaniaMinimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMinimum, uiTheme);
         lblPradLadowaniaMaksimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMaksimum, uiTheme);
+        lblEmergencyInfo = uiFactory.ReloadJLabelUISchema(lblEmergencyInfo, uiTheme);
         //endregion
 
         //region JProgressBar
@@ -173,6 +174,8 @@ public class MainWindow extends JFrame implements ActionListener {
         add(lblPradLadowaniaMinimum);
         lblPradLadowaniaMaksimum = uiFactory.NewJLabel("10A", 765, 170, 200, 30, uiTheme);
         add(lblPradLadowaniaMaksimum);
+        lblEmergencyInfo = uiFactory.NewJLabel("---", 400, 420, 400, 30, uiTheme);
+        add(lblEmergencyInfo);
         //endregion
 
         //region ProgressBar
@@ -213,6 +216,18 @@ public class MainWindow extends JFrame implements ActionListener {
     public void ChangeColorChargingButton(Color color) {
         btnChargingStateChange = uiFactory.ChangeButtonColor(btnChargingStateChange, color);
     }
+
+
+    public void SetEmergencyCommunicate(String text)
+    {
+        lblEmergencyInfo.setText(text);
+    }
+
+    public void ClearEmergencyCommunicate()
+    {
+        lblEmergencyInfo.setText("");
+    }
+
 
     @Override
     public void actionPerformed(ActionEvent actionEvent) {

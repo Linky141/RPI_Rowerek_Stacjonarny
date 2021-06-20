@@ -6,7 +6,6 @@ import com.pi4j.gpio.extension.pca.PCA9685Pin;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinPwmOutput;
-import com.pi4j.io.gpio.Pin;
 import com.pi4j.io.i2c.I2CBus;
 import com.pi4j.io.i2c.I2CDevice;
 import com.pi4j.io.i2c.I2CFactory;
@@ -19,10 +18,12 @@ public class MainThread extends Thread {
 
     //region variables
     MainWindow mainWindowReference;
-    public boolean chargingState=false;
+    public boolean chargingState = false;
     public boolean allowTurnOnCharging = false;
     private double minimumVoltageToAllowCharging = 10;
-
+    private double criticalLowBaterryVoltage = 9;
+    private double minimumVoltageToChargingWithUPS = 10.75;
+    private double maximumVoltageToChargingWithUPS = 14.1;
     //endregion
 
     //region VARIABLES
@@ -66,9 +67,9 @@ public class MainThread extends Thread {
         i2c = I2CFactory.getInstance(I2CBus.BUS_1);
 
         //region config INA3221
-                INA3221Device = i2c.getDevice(INA3221_ADDR);
+        INA3221Device = i2c.getDevice(INA3221_ADDR);
         INA3221Device.write(0x00, (byte) 0b01110001);
-        INA3221Device.write( (byte) 0b00100111);
+        INA3221Device.write((byte) 0b00100111);
 
         byte INA3221config = INA3221_CONFIG_ENABLE_CHAN1 |
                 INA3221_CONFIG_ENABLE_CHAN2 |
@@ -131,7 +132,7 @@ public class MainThread extends Thread {
         int value = 0;
         value = Byte.toUnsignedInt(bytes[1]);
         value ^= (bytes[0] << 8);
-        return (double) (value)*0.001;
+        return (double) (value) * 0.001;
     }
 
     private double INA3221_ReadVoltage2() throws IOException {
@@ -140,7 +141,7 @@ public class MainThread extends Thread {
         int value = 0;
         value = Byte.toUnsignedInt(bytes[1]);
         value ^= (bytes[0] << 8);
-        return (double) (value)*0.001;
+        return (double) (value) * 0.001;
     }
 
     private double INA3221_ReadVoltage3() throws IOException {
@@ -149,29 +150,26 @@ public class MainThread extends Thread {
         int value = 0;
         value = Byte.toUnsignedInt(bytes[1]);
         value ^= (bytes[0] << 8);
-        return (double) (value)*0.001;
+        return (double) (value) * 0.001;
     }
 
     private void ChangeChargingButtonState() throws IOException {
         CheckButtonConditions();
-        if(!chargingState) {
-            if(allowTurnOnCharging) {
+        if (!chargingState) {
+            if (allowTurnOnCharging) {
                 mainWindowReference.ChangeColorChargingButton(Color.RED);
-            }
-            else {
+            } else {
                 mainWindowReference.ChangeColorChargingButton(Color.GRAY);
             }
-        }
-        else {
+        } else {
             mainWindowReference.ChangeColorChargingButton(Color.GREEN);
         }
     }
 
     private void CheckButtonConditions() throws IOException {
-        if(INA3221_ReadVoltage2() < minimumVoltageToAllowCharging && !chargingState){
+        if (INA3221_ReadVoltage2() < minimumVoltageToAllowCharging && !chargingState) {
             allowTurnOnCharging = true;
-        }
-        else if(INA3221_ReadVoltage2() >= minimumVoltageToAllowCharging && !chargingState){
+        } else if (INA3221_ReadVoltage2() >= minimumVoltageToAllowCharging && !chargingState) {
             allowTurnOnCharging = false;
         }
     }
@@ -179,35 +177,61 @@ public class MainThread extends Thread {
     boolean changeLoadIndicator = false;
     int val, lastVal;
 
+    private boolean CheckErrors() throws IOException {
+
+        if (INA3221_ReadVoltage1() - 1 < INA3221_ReadVoltage3()) {
+            mainWindowReference.SetEmergencyCommunicate("SPALONY BEZPIECZNIK 10A");
+            return false;
+        } else if (INA3221_ReadVoltage3() < criticalLowBaterryVoltage) {
+            mainWindowReference.SetEmergencyCommunicate("WYŁADOWANY AKUMULATOR");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ExternalChargingBaterry() throws IOException {
+        if (INA3221_ReadVoltage3() < minimumVoltageToChargingWithUPS) {
+            PCA9685provider.setPwm(PCA9685Pin.PWM_02, 999);
+        }
+        else if (INA3221_ReadVoltage3() >= maximumVoltageToChargingWithUPS){
+            PCA9685provider.setPwm(PCA9685Pin.PWM_02, 1);
+        }
+    }
+
     @Override
     public void run() {
         try {
             while (true) {
+                if (!CheckErrors()) {
+                    mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
+                    mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
+                    mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
+                    allowTurnOnCharging = false;
+                    chargingState = false;
+                    ChangeChargingButtonState();
+                    Thread.sleep(1000);
+                } else {
+                    mainWindowReference.ClearEmergencyCommunicate();
+                    while (true) {
+                        if (!CheckErrors()) {
+                            break;
+                        }
+                        ExternalChargingBaterry();
+
+//                        PCA9685provider.setPwm(PCA9685Pin.PWM_00, 690);
+//                        PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
 
 
+                        mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
+                        mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
+                        mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
 
+                        ChangeChargingButtonState();
+                        Thread.sleep(10);
 
-
-//                if(load == 0) {
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 690);
-                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
-//                }
-//                else if(load==100) {
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, 499);
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, 499);
-//                }
-//                else {
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_00, (400+load));
-//                    PCA9685provider.setPwm(PCA9685Pin.PWM_01, (400+load));
-//                }
-
-                mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
-                mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
-                mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
-
-                ChangeChargingButtonState();
-                Thread.sleep(10);
-
+                    }
+                }
             }
         } catch (InterruptedException | IOException e) {
             System.out.println("MainThred is interrupted");
