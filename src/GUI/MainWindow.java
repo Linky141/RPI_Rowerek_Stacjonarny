@@ -11,6 +11,7 @@ import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 
 public class MainWindow extends JFrame implements ActionListener {
 
@@ -42,7 +43,8 @@ public class MainWindow extends JFrame implements ActionListener {
     JLabel lblNapięcieRowerkaMaksimum;
     JLabel lblPradLadowaniaMinimum;
     JLabel lblPradLadowaniaMaksimum;
-    JLabel lblEmergencyInfo;
+    JLabel lblErrorInfo;
+    JLabel lblBaterryInfo;
     //endregion
 
     //region ProgressBar
@@ -119,7 +121,8 @@ public class MainWindow extends JFrame implements ActionListener {
         lblNapięcieRowerkaMaksimum = uiFactory.ReloadJLabelUISchema(lblNapięcieRowerkaMaksimum, uiTheme);
         lblPradLadowaniaMinimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMinimum, uiTheme);
         lblPradLadowaniaMaksimum = uiFactory.ReloadJLabelUISchema(lblPradLadowaniaMaksimum, uiTheme);
-        lblEmergencyInfo = uiFactory.ReloadJLabelUISchema(lblEmergencyInfo, uiTheme);
+        lblErrorInfo = uiFactory.ReloadJLabelUISchema(lblErrorInfo, uiTheme);
+        lblBaterryInfo = uiFactory.ReloadJLabelUISchema(lblBaterryInfo, uiTheme);
         //endregion
 
         //region JProgressBar
@@ -174,8 +177,10 @@ public class MainWindow extends JFrame implements ActionListener {
         add(lblPradLadowaniaMinimum);
         lblPradLadowaniaMaksimum = uiFactory.NewJLabel("10A", 765, 170, 200, 30, uiTheme);
         add(lblPradLadowaniaMaksimum);
-        lblEmergencyInfo = uiFactory.NewJLabel("---", 400, 420, 400, 30, uiTheme);
-        add(lblEmergencyInfo);
+        lblErrorInfo = uiFactory.NewJLabel("ERROR: ---", 400, 420, 400, 30, uiTheme);
+        add(lblErrorInfo);
+        lblBaterryInfo = uiFactory.NewJLabel("AKUMULATOR: ---", 400, 390, 400, 30, uiTheme);
+        add(lblBaterryInfo);
         //endregion
 
         //region ProgressBar
@@ -200,17 +205,20 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public void setVoltageBatIndicator(double val) {
         pbarVoltageBat.setValue((int) (val *100) );
-        lblVoltageBat.setText(Double.toString(val) + "V");
+        DecimalFormat df = new DecimalFormat("#.0");
+        lblVoltageBat.setText(df.format(val) + "V");
     }
 
     public void setVoltageGenIndicator(double val) {
         pbarVoltageGen.setValue((int) (val *100));
-        lblVoltageGen.setText(Double.toString(val) + "V");
+        DecimalFormat df = new DecimalFormat("#.0");
+        lblVoltageGen.setText(df.format(val) + "V");
     }
 
     public void setCurrentChargeIndicator(double val) {
         pbarCurrentCharge.setValue((int) (val *100));
-        lblCurrentCharge.setText(Double.toString(val) + "A");
+        DecimalFormat df = new DecimalFormat("#.0");
+        lblCurrentCharge.setText(df.format(val) + "A");
     }
 
     public void ChangeColorChargingButton(Color color) {
@@ -218,14 +226,14 @@ public class MainWindow extends JFrame implements ActionListener {
     }
 
 
-    public void SetEmergencyCommunicate(String text)
+    public void SetErrorCommunicate(String text)
     {
-        lblEmergencyInfo.setText(text);
+        lblErrorInfo.setText("ERROR: " + text);
     }
 
-    public void ClearEmergencyCommunicate()
+    public void SetBaterryInformationCommunicate(String text)
     {
-        lblEmergencyInfo.setText("");
+        lblBaterryInfo.setText("AKUMULATOR: " + text);
     }
 
 
@@ -234,10 +242,10 @@ public class MainWindow extends JFrame implements ActionListener {
         if (actionEvent.getSource() == btnChargingStateChange) {
             if (!mainThread.chargingState) {
                 if (mainThread.allowTurnOnCharging) {
-                    mainThread.chargingState = true;
+                    mainThread.SetChargingState(true);
                 }
             } else {
-                mainThread.chargingState = false;
+                mainThread.SetChargingState(false);
             }
 
         } else if (actionEvent.getSource() == btnChangeUi1) {

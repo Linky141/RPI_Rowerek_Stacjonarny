@@ -18,12 +18,18 @@ public class MainThread extends Thread {
 
     //region variables
     MainWindow mainWindowReference;
+    VoltageU3Timer timerU3 = null;
     public boolean chargingState = false;
     public boolean allowTurnOnCharging = false;
+    public int chargingPWMValue = 1;
+    
+    private int increasePWMChargingIterator = -1;
     private double minimumVoltageToAllowCharging = 10;
     private double criticalLowBaterryVoltage = 9;
     private double minimumVoltageToChargingWithUPS = 10.75;
     private double maximumVoltageToChargingWithUPS = 14.1;
+    private double maxChargingCurrent = 7;
+
     //endregion
 
     //region VARIABLES
@@ -63,6 +69,8 @@ public class MainThread extends Thread {
     //region constructor
     public MainThread(MainWindow mw) throws IOException, I2CFactory.UnsupportedBusNumberException, InterruptedException {
         this.mainWindowReference = mw;
+        
+        timerU3 = new VoltageU3Timer(this);
 
         i2c = I2CFactory.getInstance(I2CBus.BUS_1);
 
@@ -144,7 +152,7 @@ public class MainThread extends Thread {
         return (double) (value) * 0.001;
     }
 
-    private double INA3221_ReadVoltage3() throws IOException {
+    public double INA3221_ReadVoltage3() throws IOException {
         byte[] bytes = new byte[2];
         INA3221Device.read(0x06, bytes, 0, 2);
         int value = 0;
@@ -152,9 +160,18 @@ public class MainThread extends Thread {
         value ^= (bytes[0] << 8);
         return (double) (value) * 0.001;
     }
+    
+    private double INA3221_ReadCurrent1() throws IOException {
+        byte[] bytes = new byte[2];
+        INA3221Device.read(0x04, bytes, 0, 2);
+        int value = 0;
+        value = Byte.toUnsignedInt(bytes[1]);
+        value ^= (bytes[0] << 8);
+        return (double) (value) * 0.001;
+    }
 
     private void ChangeChargingButtonState() throws IOException {
-        CheckButtonConditions();
+        CheckChargeOnAllow();
         if (!chargingState) {
             if (allowTurnOnCharging) {
                 mainWindowReference.ChangeColorChargingButton(Color.RED);
@@ -166,58 +183,128 @@ public class MainThread extends Thread {
         }
     }
 
-    private void CheckButtonConditions() throws IOException {
+    private void CheckChargeOnAllow() throws IOException {
+        if(CheckErrors())
+        return;
         if (INA3221_ReadVoltage2() < minimumVoltageToAllowCharging && !chargingState) {
             allowTurnOnCharging = true;
         } else if (INA3221_ReadVoltage2() >= minimumVoltageToAllowCharging && !chargingState) {
             allowTurnOnCharging = false;
         }
+    
     }
 
-    boolean changeLoadIndicator = false;
-    int val, lastVal;
 
     private boolean CheckErrors() throws IOException {
 
-        if (INA3221_ReadVoltage1() - 1 < INA3221_ReadVoltage3()) {
-            mainWindowReference.SetEmergencyCommunicate("SPALONY BEZPIECZNIK 10A");
-            return false;
+        if (INA3221_ReadVoltage1() < 3 && INA3221_ReadVoltage3() > 3) {
+                 mainWindowReference.SetBaterryInformationCommunicate("---");
+            mainWindowReference.SetErrorCommunicate("SPALONY BEZPIECZNIK 10A");
+            return true;
         } else if (INA3221_ReadVoltage3() < criticalLowBaterryVoltage) {
-            mainWindowReference.SetEmergencyCommunicate("WYŁADOWANY AKUMULATOR");
-            return false;
+            mainWindowReference.SetBaterryInformationCommunicate("błąd");
+            mainWindowReference.SetErrorCommunicate("WYŁADOWANY AKUMULATOR");
+            return true;
+        } else if (!timerU3.CheckEqualsVoltages()){
+             mainWindowReference.SetBaterryInformationCommunicate("błąd");
+            mainWindowReference.SetErrorCommunicate("AKUMULATOR USZKODZONY");
+            return true;
         }
-
-        return true;
+        mainWindowReference.SetErrorCommunicate("---");
+        return false;
     }
 
-    private void ExternalChargingBaterry() throws IOException {
-        if (INA3221_ReadVoltage3() < minimumVoltageToChargingWithUPS) {
+    private void CheckExternalCharging() throws IOException {
+        if(INA3221_ReadVoltage3() < minimumVoltageToChargingWithUPS){
+            SetUPSRelay(true);
+            mainWindowReference.SetBaterryInformationCommunicate("Ładowanie akumulatora z 230V");
+        }
+        else if(INA3221_ReadVoltage3() > maximumVoltageToChargingWithUPS){
+            SetUPSRelay(false);
+            mainWindowReference.SetBaterryInformationCommunicate("Akumulator naładowany");            
+        }
+    }
+    
+//    private boolean CheckGeneratorCharging(){
+//        if(
+//    }
+    
+    private void SetChargingPWM(int value){
+        if(value > 0 && value < 1000)
+            PCA9685provider.setPwm(PCA9685Pin.PWM_00, value);
+        else
+            PCA9685provider.setPwm(PCA9685Pin.PWM_00, 1);   
+    }
+    
+    private void SetChargingRelay(boolean state){
+        if(state)
+            PCA9685provider.setPwm(PCA9685Pin.PWM_01, 999);
+        else
+            PCA9685provider.setPwm(PCA9685Pin.PWM_01, 1);
+    }
+    
+     private void SetUPSRelay(boolean state){
+        if(state)
             PCA9685provider.setPwm(PCA9685Pin.PWM_02, 999);
-        }
-        else if (INA3221_ReadVoltage3() >= maximumVoltageToChargingWithUPS){
+        else
             PCA9685provider.setPwm(PCA9685Pin.PWM_02, 1);
-        }
     }
+
+public void SetChargingState(boolean state){
+    if(state){
+        chargingState = true;
+        increasePWMChargingIterator=0;
+    }
+    else
+    {
+        chargingState=false;
+        chargingPWMValue = 1;
+    }
+}
+
 
     @Override
     public void run() {
         try {
+            
             while (true) {
-                if (!CheckErrors()) {
+                if (CheckErrors()) {
                     mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
                     mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
-                    mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
+                    mainWindowReference.setCurrentChargeIndicator(INA3221_ReadCurrent1());
                     allowTurnOnCharging = false;
                     chargingState = false;
+                    chargingPWMValue = 1;
+                    SetChargingRelay(chargingState);
+                    SetChargingPWM(chargingPWMValue);
                     ChangeChargingButtonState();
                     Thread.sleep(1000);
-                } else {
-                    mainWindowReference.ClearEmergencyCommunicate();
+                } 
+                else {                 
                     while (true) {
-                        if (!CheckErrors()) {
+                        if (CheckErrors())
                             break;
+                        CheckExternalCharging();
+                        SetChargingRelay(chargingState);
+                        
+                        if(INA3221_ReadCurrent1() > maxChargingCurrent){
+                            chargingPWMValue--;
                         }
-                        ExternalChargingBaterry();
+                        else{
+                            if(chargingPWMValue != 999) increasePWMChargingIterator = chargingPWMValue;
+                        }
+                        
+                        
+                        if(increasePWMChargingIterator >= 0)
+                        {
+                            increasePWMChargingIterator++;
+                            chargingPWMValue++;
+                            if(increasePWMChargingIterator == 999)
+                                increasePWMChargingIterator = -1;
+                        }
+                        
+                        SetChargingPWM(chargingPWMValue);
+
 
 //                        PCA9685provider.setPwm(PCA9685Pin.PWM_00, 690);
 //                        PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
@@ -225,10 +312,10 @@ public class MainThread extends Thread {
 
                         mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
                         mainWindowReference.setVoltageGenIndicator(INA3221_ReadVoltage2());
-                        mainWindowReference.setCurrentChargeIndicator(INA3221_ReadVoltage3());
+                        mainWindowReference.setCurrentChargeIndicator(INA3221_ReadCurrent1());
 
                         ChangeChargingButtonState();
-                        Thread.sleep(10);
+                        Thread.sleep(1);
 
                     }
                 }
