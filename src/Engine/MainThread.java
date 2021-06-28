@@ -18,17 +18,21 @@ public class MainThread extends Thread {
 
     //region variables
     MainWindow mainWindowReference;
-    VoltageU3Timer timerU3 = null;
+    VoltageU3Timer timer = null;
     public boolean chargingState = false;
     public boolean allowTurnOnCharging = false;
     public int chargingPWMValue = 1;
-    
+
     private int increasePWMChargingIterator = -1;
-    private double minimumVoltageToAllowCharging = 10;
-    private double criticalLowBaterryVoltage = 9;
+    private double minimumVoltageToAllowCharging = 8;
+    private double criticalLowBaterryVoltage = 8;
+    private double criticalHighBaterryVoltage = 18;
     private double minimumVoltageToChargingWithUPS = 10.75;
     private double maximumVoltageToChargingWithUPS = 14.1;
     private double maxChargingCurrent = 7;
+    private int maximumMOSLoad = 999;
+    private int minimumMOSLoad = 1;
+    private double maximumRechargingVoltage = 14.5;
 
     //endregion
 
@@ -69,8 +73,9 @@ public class MainThread extends Thread {
     //region constructor
     public MainThread(MainWindow mw) throws IOException, I2CFactory.UnsupportedBusNumberException, InterruptedException {
         this.mainWindowReference = mw;
-        
-        timerU3 = new VoltageU3Timer(this);
+
+        timer = new VoltageU3Timer(this);
+
 
         i2c = I2CFactory.getInstance(I2CBus.BUS_1);
 
@@ -92,6 +97,7 @@ public class MainThread extends Thread {
 
         //endregion
 
+        timer.start();
         //region configPCA9685
         BigDecimal frequency = new BigDecimal("1000");
         BigDecimal frequencyCorrectionFactor = new BigDecimal("1");
@@ -134,7 +140,7 @@ public class MainThread extends Thread {
         return myOutputs;
     }
 
-    private double INA3221_ReadVoltage1() throws IOException {
+    public double INA3221_ReadVoltage1() throws IOException {
         byte[] bytes = new byte[2];
         INA3221Device.read(0x02, bytes, 0, 2);
         int value = 0;
@@ -143,7 +149,7 @@ public class MainThread extends Thread {
         return (double) (value) * 0.001;
     }
 
-    private double INA3221_ReadVoltage2() throws IOException {
+    public double INA3221_ReadVoltage2() throws IOException {
         byte[] bytes = new byte[2];
         INA3221Device.read(0x04, bytes, 0, 2);
         int value = 0;
@@ -160,8 +166,8 @@ public class MainThread extends Thread {
         value ^= (bytes[0] << 8);
         return (double) (value) * 0.001;
     }
-    
-    private double INA3221_ReadCurrent1() throws IOException {
+
+    public double INA3221_ReadCurrent1() throws IOException {
         byte[] bytes = new byte[2];
         INA3221Device.read(0x04, bytes, 0, 2);
         int value = 0;
@@ -184,30 +190,27 @@ public class MainThread extends Thread {
     }
 
     private void CheckChargeOnAllow() throws IOException {
-        if(CheckErrors())
-        return;
-        if (INA3221_ReadVoltage2() < minimumVoltageToAllowCharging && !chargingState) {
-            allowTurnOnCharging = true;
-        } else if (INA3221_ReadVoltage2() >= minimumVoltageToAllowCharging && !chargingState) {
+        if (CheckErrors()){
             allowTurnOnCharging = false;
         }
-    
+        else if (INA3221_ReadVoltage2() > minimumVoltageToAllowCharging || INA3221_ReadVoltage3() > maximumVoltageToChargingWithUPS) {
+            allowTurnOnCharging = false;
+        } else if(timer.CheckU2(false, minimumVoltageToAllowCharging)) {
+            allowTurnOnCharging = true;
+        }
+
     }
 
 
     private boolean CheckErrors() throws IOException {
 
         if (INA3221_ReadVoltage1() < 3 && INA3221_ReadVoltage3() > 3) {
-                 mainWindowReference.SetBaterryInformationCommunicate("---");
+            mainWindowReference.SetBaterryInformationCommunicate("---");
             mainWindowReference.SetErrorCommunicate("SPALONY BEZPIECZNIK 10A");
             return true;
-        } else if (INA3221_ReadVoltage3() < criticalLowBaterryVoltage) {
+        } else if (timer.CheckU3(false, criticalLowBaterryVoltage) || timer.CheckU3(true, criticalHighBaterryVoltage)) {
             mainWindowReference.SetBaterryInformationCommunicate("błąd");
-            mainWindowReference.SetErrorCommunicate("WYŁADOWANY AKUMULATOR");
-            return true;
-        } else if (!timerU3.CheckEqualsVoltages()){
-             mainWindowReference.SetBaterryInformationCommunicate("błąd");
-            mainWindowReference.SetErrorCommunicate("AKUMULATOR USZKODZONY");
+            mainWindowReference.SetErrorCommunicate("USZKODZONY AKUMULATOR");
             return true;
         }
         mainWindowReference.SetErrorCommunicate("---");
@@ -215,58 +218,51 @@ public class MainThread extends Thread {
     }
 
     private void CheckExternalCharging() throws IOException {
-        if(INA3221_ReadVoltage3() < minimumVoltageToChargingWithUPS){
+        if (timer.CheckU3(false, minimumVoltageToAllowCharging)) {
             SetUPSRelay(true);
             mainWindowReference.SetBaterryInformationCommunicate("Ładowanie akumulatora z 230V");
-        }
-        else if(INA3221_ReadVoltage3() > maximumVoltageToChargingWithUPS){
+        } else if (timer.CheckU3(true, maximumVoltageToChargingWithUPS)) {
             SetUPSRelay(false);
-            mainWindowReference.SetBaterryInformationCommunicate("Akumulator naładowany");            
+            mainWindowReference.SetBaterryInformationCommunicate("Akumulator naładowany");
         }
     }
-    
-//    private boolean CheckGeneratorCharging(){
-//        if(
-//    }
-    
-    private void SetChargingPWM(int value){
-        if(value > 0 && value < 1000)
+
+
+    private void SetChargingPWM(int value) {
+        if (value > 0 && value < 1000)
             PCA9685provider.setPwm(PCA9685Pin.PWM_00, value);
         else
-            PCA9685provider.setPwm(PCA9685Pin.PWM_00, 1);   
+            PCA9685provider.setPwm(PCA9685Pin.PWM_00, 1);
     }
-    
-    private void SetChargingRelay(boolean state){
-        if(state)
+
+    private void SetChargingRelay(boolean state) {
+        if (state)
             PCA9685provider.setPwm(PCA9685Pin.PWM_01, 999);
         else
             PCA9685provider.setPwm(PCA9685Pin.PWM_01, 1);
     }
-    
-     private void SetUPSRelay(boolean state){
-        if(state)
+
+    private void SetUPSRelay(boolean state) {
+        if (state)
             PCA9685provider.setPwm(PCA9685Pin.PWM_02, 999);
         else
             PCA9685provider.setPwm(PCA9685Pin.PWM_02, 1);
     }
 
-public void SetChargingState(boolean state){
-    if(state){
-        chargingState = true;
-        increasePWMChargingIterator=0;
+    public void SetChargingState(boolean state) {
+        if (state) {
+            chargingState = true;
+            increasePWMChargingIterator = 0;
+        } else {
+            chargingState = false;
+            chargingPWMValue = 1;
+        }
     }
-    else
-    {
-        chargingState=false;
-        chargingPWMValue = 1;
-    }
-}
 
 
     @Override
     public void run() {
         try {
-            
             while (true) {
                 if (CheckErrors()) {
                     mainWindowReference.setVoltageBatIndicator(INA3221_ReadVoltage1());
@@ -279,30 +275,35 @@ public void SetChargingState(boolean state){
                     SetChargingPWM(chargingPWMValue);
                     ChangeChargingButtonState();
                     Thread.sleep(1000);
-                } 
-                else {                 
+                } else {
                     while (true) {
                         if (CheckErrors())
                             break;
                         CheckExternalCharging();
                         SetChargingRelay(chargingState);
-                        
-                        if(INA3221_ReadCurrent1() > maxChargingCurrent){
-                            chargingPWMValue--;
+
+
+                        if (timer.CheckU3(true, maximumRechargingVoltage)) {
+                            if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue >= minimumMOSLoad) {
+                                chargingPWMValue--;
+                            } else if (chargingPWMValue <= maximumMOSLoad) {
+                                chargingPWMValue++;
+                            }
+                        } else {
+                            if (INA3221_ReadCurrent1() > maxChargingCurrent && chargingPWMValue >= minimumMOSLoad) {
+                                chargingPWMValue--;
+                            } else if (chargingPWMValue <= maximumMOSLoad) {
+                                chargingPWMValue++;
+                            }
                         }
-                        else{
-                            if(chargingPWMValue != 999) increasePWMChargingIterator = chargingPWMValue;
-                        }
-                        
-                        
-                        if(increasePWMChargingIterator >= 0)
-                        {
+
+                        if (increasePWMChargingIterator >= 0) {
                             increasePWMChargingIterator++;
                             chargingPWMValue++;
-                            if(increasePWMChargingIterator == 999)
+                            if (increasePWMChargingIterator == 999)
                                 increasePWMChargingIterator = -1;
                         }
-                        
+
                         SetChargingPWM(chargingPWMValue);
 
 
