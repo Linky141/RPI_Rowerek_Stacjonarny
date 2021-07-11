@@ -66,14 +66,14 @@ public boolean CheckU2(boolean prefix, double value)
 {
     if(prefix)
     {
-        if(value > U2voltageA && value > U2voltageB)
+        if(value < U2voltageA && value < U2voltageB)
             return true;
         else
             return false;
     }
     else
     {
-        if(value < U2voltageA && value < U2voltageB)
+        if(value > U2voltageA && value > U2voltageB)
             return true;
         else
             return false;        
@@ -90,9 +90,10 @@ public boolean CheckU2(boolean prefix, double value)
                 U3voltageA = mainThread.INA3221_ReadVoltage3();      
                 
                 U2voltageB = U2voltageA;
-                U2voltageA = mainThread.INA3221_ReadVoltage2();                
+                U2voltageA = mainThread.INA3221_ReadVoltage2();        
+              //  System.out.println(U2voltageA + " " + U2voltageB +"   " +  CheckU2(false, 8));
               Thread.sleep(3000);
-                System.out.println(U3voltageA + " " + U3voltageB);
+                
             }
         } catch (InterruptedException | IOException e) {
             e.printStackTrace();

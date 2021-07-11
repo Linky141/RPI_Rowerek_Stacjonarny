@@ -29,10 +29,11 @@ public class MainThread extends Thread {
     private double criticalHighBaterryVoltage = 18;
     private double minimumVoltageToChargingWithUPS = 10.75;
     private double maximumVoltageToChargingWithUPS = 14.1;
-    private double maxChargingCurrent = 7;
-    private int maximumMOSLoad = 999;
-    private int minimumMOSLoad = 1;
+    private double maxChargingCurrent = 1;
+    private int maximumMOSLoad = 400;
+    private int minimumMOSLoad = 100;
     private double maximumRechargingVoltage = 14.5;
+    private int changePWMStep = 50;
 
     //endregion
 
@@ -155,7 +156,7 @@ public class MainThread extends Thread {
         int value = 0;
         value = Byte.toUnsignedInt(bytes[1]);
         value ^= (bytes[0] << 8);
-        return (double) (value) * 0.001;
+        return (double) (value) * 0.007;
     }
 
     public double INA3221_ReadVoltage3() throws IOException {
@@ -169,11 +170,11 @@ public class MainThread extends Thread {
 
     public double INA3221_ReadCurrent1() throws IOException {
         byte[] bytes = new byte[2];
-        INA3221Device.read(0x04, bytes, 0, 2);
+        INA3221Device.read(0x01, bytes, 0, 2);
         int value = 0;
         value = Byte.toUnsignedInt(bytes[1]);
         value ^= (bytes[0] << 8);
-        return (double) (value) * 0.001;
+        return (double) (value) * 0.0005;
     }
 
     private void ChangeChargingButtonState() throws IOException {
@@ -284,28 +285,28 @@ public class MainThread extends Thread {
 
 
                         if (timer.CheckU3(true, maximumRechargingVoltage)) {
-                            if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue >= minimumMOSLoad) {
-                                chargingPWMValue--;
-                            } else if (chargingPWMValue <= maximumMOSLoad) {
-                                chargingPWMValue++;
+                            if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue > minimumMOSLoad) {
+                                chargingPWMValue -= changePWMStep;
+                            } else if (chargingPWMValue < maximumMOSLoad) {
+                                chargingPWMValue+= changePWMStep;
                             }
                         } else {
-                            if (INA3221_ReadCurrent1() > maxChargingCurrent && chargingPWMValue >= minimumMOSLoad) {
-                                chargingPWMValue--;
-                            } else if (chargingPWMValue <= maximumMOSLoad) {
-                                chargingPWMValue++;
+                            if (INA3221_ReadCurrent1() > maxChargingCurrent && chargingPWMValue > minimumMOSLoad) {
+                                chargingPWMValue -= changePWMStep;
+                            } else if (chargingPWMValue < maximumMOSLoad) {
+                                chargingPWMValue+= changePWMStep;
                             }
                         }
 
                         if (increasePWMChargingIterator >= 0) {
                             increasePWMChargingIterator++;
-                            chargingPWMValue++;
-                            if (increasePWMChargingIterator == 999)
+                            if(chargingPWMValue < maximumMOSLoad) chargingPWMValue++;
+                            if (increasePWMChargingIterator == maximumMOSLoad)
                                 increasePWMChargingIterator = -1;
                         }
 
                         SetChargingPWM(chargingPWMValue);
-
+                        //System.out.println(chargingPWMValue);
 
 //                        PCA9685provider.setPwm(PCA9685Pin.PWM_00, 690);
 //                        PCA9685provider.setPwm(PCA9685Pin.PWM_01, 800);
@@ -323,6 +324,7 @@ public class MainThread extends Thread {
             }
         } catch (InterruptedException | IOException e) {
             System.out.println("MainThred is interrupted");
+            System.out.println(e);
         }
 //        catch (IOException e) {
 //            e.printStackTrace();
