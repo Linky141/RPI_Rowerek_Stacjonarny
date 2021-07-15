@@ -163,7 +163,7 @@ public class MainWindow extends JFrame implements ActionListener {
         add(lblVoltageGen);
         lblCurrentCharge = uiFactory.NewJLabel("0.00A", 450, 170, 100, 30, uiTheme);
         add(lblCurrentCharge);
-        lblMyCredit = uiFactory.NewJLabel("Linky141-2021", 20, 450, 200, 30, uiTheme);
+        lblMyCredit = uiFactory.NewJLabel("Rowerek-2021", 20, 450, 200, 30, uiTheme);
         add(lblMyCredit);
         lblNapięcieAkumulatoraMinimum = uiFactory.NewJLabel("8V", 10, 30, 200, 30, uiTheme);
         add(lblNapięcieAkumulatoraMinimum);

@@ -26,14 +26,15 @@ public class MainThread extends Thread {
     private int increasePWMChargingIterator = -1;
     private double minimumVoltageToAllowCharging = 8;
     private double criticalLowBaterryVoltage = 8;
-    private double criticalHighBaterryVoltage = 18;
+    private double criticalHighBaterryVoltage = 17;
     private double minimumVoltageToChargingWithUPS = 10.75;
     private double maximumVoltageToChargingWithUPS = 14.1;
-    private double maxChargingCurrent = 1;
+    private double maxChargingCurrent = 8;
     private int maximumMOSLoad = 400;
-    private int minimumMOSLoad = 100;
+    private int minimumMOSLoad = 150;
     private double maximumRechargingVoltage = 14.5;
-    private int changePWMStep = 50;
+    private int changePWMStep = 10;
+    private boolean checkError = false;
 
     //endregion
 
@@ -206,25 +207,35 @@ public class MainThread extends Thread {
     private boolean CheckErrors() throws IOException {
 
         if (INA3221_ReadVoltage1() < 3 && INA3221_ReadVoltage3() > 3) {
-            mainWindowReference.SetBaterryInformationCommunicate("---");
+            mainWindowReference.SetBaterryInformationCommunicate("błąd");
             mainWindowReference.SetErrorCommunicate("SPALONY BEZPIECZNIK 10A");
+            checkError = true;
             return true;
         } else if (timer.CheckU3(false, criticalLowBaterryVoltage) || timer.CheckU3(true, criticalHighBaterryVoltage)) {
             mainWindowReference.SetBaterryInformationCommunicate("błąd");
             mainWindowReference.SetErrorCommunicate("USZKODZONY AKUMULATOR");
+            checkError = true;
             return true;
         }
+        if(checkError){
         mainWindowReference.SetErrorCommunicate("---");
+        mainWindowReference.SetBaterryInformationCommunicate("---");
+        checkError = false;  
+      }
         return false;
     }
 
     private void CheckExternalCharging() throws IOException {
-        if (timer.CheckU3(false, minimumVoltageToAllowCharging)) {
+        if (timer.CheckU3(false, minimumVoltageToChargingWithUPS) && INA3221_ReadVoltage3() > criticalLowBaterryVoltage) {
             SetUPSRelay(true);
-            mainWindowReference.SetBaterryInformationCommunicate("Ładowanie akumulatora z 230V");
+            mainWindowReference.SetBaterryInformationCommunicate("Ładowanie z UPS");
         } else if (timer.CheckU3(true, maximumVoltageToChargingWithUPS)) {
             SetUPSRelay(false);
             mainWindowReference.SetBaterryInformationCommunicate("Akumulator naładowany");
+        }
+        else if (timer.CheckU3(false, maximumVoltageToChargingWithUPS)) {
+            SetUPSRelay(false);
+            mainWindowReference.SetBaterryInformationCommunicate("---");
         }
     }
 
@@ -262,7 +273,10 @@ public class MainThread extends Thread {
 
     public void CheckOverloadAndWork() throws IOException {
 
-        if (timer.CheckU3(true, maximumRechargingVoltage)) {
+            if(INA3221_ReadCurrent1() > 9){
+                chargingPWMValue = minimumMOSLoad;
+            }
+            else if (timer.CheckU3(true, maximumRechargingVoltage)) {
             if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue > minimumMOSLoad+changePWMStep) {
                 chargingPWMValue -= changePWMStep;
             } else if (!(INA3221_ReadCurrent1() > 0.5) && chargingPWMValue < maximumMOSLoad) {
@@ -293,6 +307,7 @@ public class MainThread extends Thread {
                     chargingPWMValue = 1;
                     SetChargingRelay(chargingState);
                     SetChargingPWM(chargingPWMValue);
+                    SetUPSRelay(false);
                     ChangeChargingButtonState();
                     Thread.sleep(1000);
                 } else {
