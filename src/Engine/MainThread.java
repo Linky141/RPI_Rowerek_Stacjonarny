@@ -260,6 +260,25 @@ public class MainThread extends Thread {
         }
     }
 
+    public void CheckOverloadAndWork() throws IOException {
+
+        if (timer.CheckU3(true, maximumRechargingVoltage)) {
+            if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue > minimumMOSLoad+changePWMStep) {
+                chargingPWMValue -= changePWMStep;
+            } else if (!(INA3221_ReadCurrent1() > 0.5) && chargingPWMValue < maximumMOSLoad) {
+                chargingPWMValue+= changePWMStep;
+            }
+        } else {
+            if (INA3221_ReadCurrent1() > maxChargingCurrent && chargingPWMValue > minimumMOSLoad+changePWMStep) {
+                chargingPWMValue -= changePWMStep;
+            } else if (!(INA3221_ReadCurrent1() > maxChargingCurrent) && chargingPWMValue < maximumMOSLoad) {
+                chargingPWMValue+= changePWMStep;
+            }
+        }
+
+        SetChargingPWM(chargingPWMValue);
+
+    }
 
     @Override
     public void run() {
@@ -284,26 +303,7 @@ public class MainThread extends Thread {
                         SetChargingRelay(chargingState);
 
 
-                        if (timer.CheckU3(true, maximumRechargingVoltage)) {
-                            if (INA3221_ReadCurrent1() > 0.5 && chargingPWMValue > minimumMOSLoad) {
-                                chargingPWMValue -= changePWMStep;
-                            } else if (chargingPWMValue < maximumMOSLoad) {
-                                chargingPWMValue+= changePWMStep;
-                            }
-                        } else {
-                            if (INA3221_ReadCurrent1() > maxChargingCurrent && chargingPWMValue > minimumMOSLoad) {
-                                chargingPWMValue -= changePWMStep;
-                            } else if (chargingPWMValue < maximumMOSLoad) {
-                                chargingPWMValue+= changePWMStep;
-                            }
-                        }
-
-                        if (increasePWMChargingIterator >= 0) {
-                            increasePWMChargingIterator++;
-                            if(chargingPWMValue < maximumMOSLoad) chargingPWMValue++;
-                            if (increasePWMChargingIterator == maximumMOSLoad)
-                                increasePWMChargingIterator = -1;
-                        }
+                        CheckOverloadAndWork();
 
                         SetChargingPWM(chargingPWMValue);
                         //System.out.println(chargingPWMValue);
